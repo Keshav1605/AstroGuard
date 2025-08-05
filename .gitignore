@@ -35,11 +35,13 @@ tmp/
 # =============================================================================
 # GENERATED VISUALIZATIONS
 # =============================================================================
-# Performance analysis outputs
-confusion_matrix.png
+# Performance analysis outputs (old incorrect ones)
 performance_metrics.png
 training_curves.png
 performance_dashboard.html
+
+# Allow the correct confusion matrix
+# proper_confusion_matrix.png - KEEP THIS FILE
 
 # =============================================================================
 # PYTHON
