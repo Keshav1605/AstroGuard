@@ -1,10 +1,12 @@
-EPOCHS = 5
-MOSAIC = 0.1
+EPOCHS = 20
+MOSAIC = 0.5
 OPTIMIZER = 'AdamW'
-MOMENTUM = 0.2
-LR0 = 0.001
-LRF = 0.0001
+MOMENTUM = 0.937
+LR0 = 0.01
+LRF = 0.01
 SINGLE_CLS = False
+MIXUP = 0.1
+COPY_PASTE = 0.1
 import argparse
 from ultralytics import YOLO
 import os
@@ -26,16 +28,22 @@ if __name__ == '__main__':
     parser.add_argument('--lrf', type=float, default=LRF, help='Final learning rate')
     # single_cls
     parser.add_argument('--single_cls', type=bool, default=SINGLE_CLS, help='Single class training')
+    # mixup
+    parser.add_argument('--mixup', type=float, default=MIXUP, help='Mixup augmentation')
+    # copy_paste
+    parser.add_argument('--copy_paste', type=float, default=COPY_PASTE, help='Copy paste augmentation')
     args = parser.parse_args()
     this_dir = os.path.dirname(__file__)
     os.chdir(this_dir)
-    model = YOLO(os.path.join(this_dir, "yolov8s.pt"))
+    model = YOLO(os.path.join(this_dir, "yolov8m.pt"))
     results = model.train(
         data=os.path.join(this_dir, "yolo_params.yaml"), 
         epochs=args.epochs,
         device='cpu',
         single_cls=args.single_cls, 
         mosaic=args.mosaic,
+        mixup=args.mixup,
+        copy_paste=args.copy_paste,
         optimizer=args.optimizer, 
         lr0 = args.lr0, 
         lrf = args.lrf, 

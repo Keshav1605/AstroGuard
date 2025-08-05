@@ -15,11 +15,11 @@ class YoloVisualizer:
     
     def set_mode(self, mode=MODE_TRAIN):
         if mode == self.MODE_TRAIN:
-            self.images_folder = os.path.join(self.dataset_folder, "train", "images")
-            self.labels_folder = os.path.join(self.dataset_folder, "train", "labels")
+            self.images_folder = os.path.join(self.dataset_folder, "data", "train", "images")
+            self.labels_folder = os.path.join(self.dataset_folder, "data", "train", "labels")
         else:
-            self.images_folder = os.path.join(self.dataset_folder, "val", "images")
-            self.labels_folder = os.path.join(self.dataset_folder, "val", "labels")
+            self.images_folder = os.path.join(self.dataset_folder, "data", "val", "images")
+            self.labels_folder = os.path.join(self.dataset_folder, "data", "val", "labels")
         self.num_images = len(os.listdir(self.images_folder))
         num_labels = len(os.listdir(self.labels_folder))
         self.label_names = sorted(os.listdir(self.labels_folder))
