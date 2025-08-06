@@ -1,8 +1,8 @@
-# 🚀 YOLOv8 Space Station Object Detection
+# YOLOv8 Space Station Object Detection
 
 A complete object detection pipeline using YOLOv8 to detect **Toolbox**, **Oxygen Tank**, and **Fire Extinguisher** in space station environments using synthetic data from Duality AI Falcon platform.
 
-## 🎯 Project Goals
+## Project Goals
 
 - Achieve **≥90% mAP@0.5** accuracy
 - Robust detection under varying lighting conditions
@@ -10,7 +10,7 @@ A complete object detection pipeline using YOLOv8 to detect **Toolbox**, **Oxyge
 - Real-time inference capabilities
 - Comprehensive evaluation and visualization
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#-features)
 - [Installation](#-installation)
@@ -22,9 +22,9 @@ A complete object detection pipeline using YOLOv8 to detect **Toolbox**, **Oxyge
 - [Configuration](#-configuration)
 - [Troubleshooting](#-troubleshooting)
 
-## ✨ Features
+## Features
 
-### 🎯 Core Functionality
+### Core Functionality
 - **YOLOv8 Training Pipeline** with hyperparameter optimization
 - **Data Augmentation** (mosaic, HSV, flip, rotation, scaling)
 - **Comprehensive Evaluation** (mAP@0.5, confusion matrix, per-class metrics)
@@ -32,21 +32,21 @@ A complete object detection pipeline using YOLOv8 to detect **Toolbox**, **Oxyge
 - **Real-time Web Application** with Streamlit
 - **Model Optimization Strategies** for accuracy improvement
 
-### 📊 Analytics & Visualization
+### Analytics & Visualization
 - Training curves and loss plots
 - Confusion matrix visualization
 - Per-class performance metrics
 - Dataset distribution analysis
 - Failure case documentation
 
-### 🔧 Technical Features
+### Technical Features
 - Modular and clean code architecture
 - Comprehensive logging and error handling
 - GPU/CPU support with automatic device detection
 - Configurable hyperparameters via YAML
 - Model checkpointing and resume training
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 - Python 3.8+
@@ -91,7 +91,7 @@ mkdir -p runs/{train,val}
 mkdir -p logs models results
 ```
 
-## 📁 Dataset Preparation
+## Dataset Preparation
 
 ### Dataset Structure
 ```
@@ -139,7 +139,7 @@ python data_utils.py --action split_dataset --images-dir raw_images --labels-dir
 python data_utils.py --action visualize --images-dir dataset/train/images --labels-dir dataset/train/labels
 ```
 
-## 🎯 Training
+## Training
 
 ### Basic Training
 ```bash
@@ -173,7 +173,7 @@ Edit `config.yaml` to customize:
 - **Training summary**: `training_summary.txt`
 - **Logs**: `training.log`
 
-## 📊 Evaluation
+## Evaluation
 
 ### Model Evaluation
 ```bash
@@ -199,7 +199,7 @@ python predict.py --model runs/train/yolov8_training/weights/best.pt --images da
 - **Failure cases**: `failure_cases.json`
 - **Optimization recommendations**: `optimization_recommendations.txt`
 
-## 🌐 Web Application
+## Web Application
 
 ### Launch Streamlit App
 ```bash
@@ -219,7 +219,7 @@ streamlit run app.py
 4. View detection results and statistics
 5. Analyze performance in the analytics tab
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 space-station-object-detection/
@@ -243,7 +243,7 @@ space-station-object-detection/
 └── results/                # Evaluation results
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Key Configuration Parameters
 
@@ -280,7 +280,7 @@ names:
   2: Fire Extinguisher
 ```
 
-## 🎯 Model Optimization Strategies
+## Model Optimization Strategies
 
 ### For Achieving ≥90% mAP@0.5
 
@@ -302,7 +302,7 @@ names:
 - **Test Time Augmentation**: Use TTA during inference
 - **Model Pruning**: Optimize for speed vs accuracy trade-off
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -354,7 +354,7 @@ python data_utils.py --action analyze --dataset-dir dataset
 - **CPU usage**: Check with `htop`
 - **Disk space**: Ensure sufficient storage for logs
 
-## 📈 Performance Benchmarks
+## Performance Benchmarks
 
 ### Target Metrics
 - **mAP@0.5**: ≥90%
@@ -370,7 +370,7 @@ python data_utils.py --action analyze --dataset-dir dataset
 | YOLOv8m | 90-94% | 25.9 | 25.9 |
 | YOLOv8l | 92-96% | 43.7 | 43.7 |
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -378,18 +378,18 @@ python data_utils.py --action analyze --dataset-dir dataset
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Ultralytics** for YOLOv8 implementation
 - **Duality AI** for Falcon synthetic data platform
 - **Streamlit** for web application framework
 - **OpenCV** for computer vision utilities
 
-## 📞 Support
+## Support
 
 For questions and support:
 - Create an issue on GitHub
@@ -397,5 +397,6 @@ For questions and support:
 - Review the documentation
 
 ---
+
 
 **Happy detecting! 🚀🔍** 
