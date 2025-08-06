@@ -20,6 +20,12 @@ import zipfile
 import io
 import base64
 from datetime import datetime
+import threading
+import time
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
+import queue
+
+model = YOLO("yolov8n.pt")
 
 # Page configuration
 st.set_page_config(
@@ -29,16 +35,103 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+class LiveObjectDetection(VideoTransformerBase):
+    def __init__(self, model, class_names, class_colors, conf_threshold=0.25):
+        self.model = model
+        self.class_names = class_names
+        self.class_colors = class_colors
+        self.conf_threshold = conf_threshold
+        self.detection_queue = queue.Queue()
+        self.frame_count = 0
+        
+    def transform(self, frame):
+        if self.model is None:
+            return frame
+        
+        try:
+            # Convert frame to numpy array
+            img = frame.to_ndarray(format="bgr24")
+            
+            # Run detection every 3 frames to maintain performance
+            self.frame_count += 1
+            if self.frame_count % 3 == 0:
+                try:
+                    # Run prediction
+                    results = self.model.predict(
+                        source=img,
+                        conf=self.conf_threshold,
+                        save=False
+                    )
+                    
+                    if results and len(results) > 0:
+                        result = results[0]
+                        
+                        # Draw detections
+                        if result.boxes is not None and len(result.boxes) > 0:
+                            for box in result.boxes:
+                                # Get coordinates
+                                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                                
+                                # Get class and confidence
+                                class_id = int(box.cls[0])
+                                confidence = float(box.conf[0])
+                                
+                                if class_id < len(self.class_names):
+                                    class_name = self.class_names[class_id]
+                                    
+                                    # Get color
+                                    color = self.class_colors.get(class_name, (255, 255, 255))
+                                    if isinstance(color, str):
+                                        # Convert hex to BGR
+                                        color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))[::-1]
+                                    
+                                    # Draw bounding box
+                                    cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+                                    
+                                    # Draw label
+                                    label = f"{class_name}: {confidence:.2f}"
+                                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+                                    cv2.rectangle(img, (x1, y1 - label_size[1] - 10), 
+                                                 (x1 + label_size[0], y1), color, -1)
+                                    cv2.putText(img, label, (x1, y1 - 5), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                                    
+                                    # Add detection info to queue for display
+                                    detection_info = {
+                                        'class': class_name,
+                                        'confidence': confidence,
+                                        'bbox': [x1, y1, x2, y2],
+                                        'timestamp': time.time()
+                                    }
+                                    try:
+                                        self.detection_queue.put_nowait(detection_info)
+                                    except queue.Full:
+                                        pass  # Queue is full, skip this detection
+                                        
+                except Exception as e:
+                    print(f"Detection error: {e}")
+            
+            return img
+        except Exception as e:
+            print(f"Frame processing error: {e}")
+            return frame
+
 class ObjectDetectionApp:
     def __init__(self):
         """Initialize the Streamlit app."""
         self.model = None
         self.config = self.load_config()
-        self.class_names = list(self.config['names'].values())
+        # ✅ Fixed class mapping based on training
+        self.class_names = [
+            'Fire Extinguisher',   # class 2
+            'Toolbox',            # class 0
+            'Oxygen Tank'        # class 1
+        ]
         self.class_colors = {
-            'Toolbox': '#FF6B6B',
-            'Oxygen Tank': '#4ECDC4', 
-            'Fire Extinguisher': '#45B7D1'
+            'Toolbox': "#E56626",
+            'Oxygen Tank': "#D4CEC1",
+            'Fire Extinguisher': "#FF0000"
         }
         
     def load_config(self):
@@ -46,11 +139,17 @@ class ObjectDetectionApp:
         try:
             with open('config.yaml', 'r') as file:
                 config = yaml.safe_load(file)
+            # ✅ Keep training order
+            config['names'] = {
+                0: 'Fire Extinguisher',
+                1: 'Toolbox',
+                2: 'Oxygen Tank'
+            }
             return config
         except Exception as e:
             st.error(f"Error loading config: {e}")
-            return {'names': {0: 'Toolbox', 1: 'Oxygen Tank', 2: 'Fire Extinguisher'}}
-    
+            return {'names': {1: 'Toolbox', 2: 'Oxygen Tank', 0: 'Fire Extinguisher'}}
+
     def load_model(self, model_path):
         """Load trained YOLOv8 model."""
         try:
@@ -102,7 +201,7 @@ class ObjectDetectionApp:
             color = self.class_colors.get(class_name, (255, 255, 255))
             if isinstance(color, str):
                 # Convert hex to BGR
-                color = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))[::-1]
+                color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))[::-1]
             
             # Draw bounding box
             cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)
@@ -248,7 +347,7 @@ def main():
     )
     
     # Main content
-    tab1, tab2, tab3, tab4 = st.tabs(["📷 Image Upload", "📹 Webcam", "📊 Analytics", "📥 Downloads"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📷 Image Upload", "📹 Live Webcam", "📊 Analytics", "📥 Downloads"])
     
     with tab1:
         st.header("Image Upload")
@@ -287,76 +386,6 @@ def main():
                     if not stats_df.empty:
                         st.subheader("Detection Statistics")
                         st.dataframe(stats_df, use_container_width=True)
-                    
-                    # Download detection results
-                    st.subheader("📥 Download Results")
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        # Download annotated image
-                        annotated_pil = Image.fromarray(annotated_image)
-                        img_buffer = io.BytesIO()
-                        annotated_pil.save(img_buffer, format='PNG')
-                        img_buffer.seek(0)
-                        
-                        st.download_button(
-                            label="📷 Download Annotated Image",
-                            data=img_buffer.getvalue(),
-                            file_name=f"webcam_detection_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                            mime="image/png"
-                        )
-                    
-                    with col2:
-                        # Download statistics as CSV
-                        if not stats_df.empty:
-                            csv_buffer = io.BytesIO()
-                            stats_df.to_csv(csv_buffer, index=False)
-                            csv_buffer.seek(0)
-                            
-                            st.download_button(
-                                label="📊 Download Statistics (CSV)",
-                                data=csv_buffer.getvalue(),
-                                file_name=f"webcam_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                                mime="text/csv"
-                            )
-                    
-                    with col3:
-                        # Download detection report
-                        report_text = f"""
-# Webcam Detection Report
-Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-## Detection Information
-- Source: Webcam capture
-- Detection confidence threshold: {conf_threshold}
-- Total detections: {len(result.boxes)}
-
-## Detection Results
-"""
-                        for i, box in enumerate(result.boxes):
-                            class_id = int(box.cls[0])
-                            confidence = float(box.conf[0])
-                            class_name = app.class_names[class_id]
-                            report_text += f"\n### Detection {i+1}\n"
-                            report_text += f"- Class: {class_name}\n"
-                            report_text += f"- Confidence: {confidence:.3f}\n"
-                            report_text += f"- Bounding Box: {box.xyxy[0].cpu().numpy().tolist()}\n"
-                        
-                        report_buffer = io.BytesIO()
-                        report_buffer.write(report_text.encode())
-                        report_buffer.seek(0)
-                        
-                        st.download_button(
-                            label="📄 Download Report (MD)",
-                            data=report_buffer.getvalue(),
-                            file_name=f"webcam_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                            mime="text/markdown"
-                        )
-                    
-                    # Show chart
-                    chart = app.create_confusion_chart(result)
-                    if chart is not None:
-                        st.plotly_chart(chart, use_container_width=True)
                     
                     # Download detection results
                     st.subheader("📥 Download Results")
@@ -422,49 +451,240 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                             file_name=f"detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                             mime="text/markdown"
                         )
+                    
+                    # Show chart
+                    chart = app.create_confusion_chart(result)
+                    if chart is not None:
+                        st.plotly_chart(chart, use_container_width=True)
                 else:
                     st.error("Detection failed!")
             else:
                 st.warning("Please load a model first!")
     
     with tab2:
-        st.header("Webcam Detection")
+        st.header("📹 Live Webcam Detection")
+        st.markdown("Real-time object detection using your webcam")
         
-        # Webcam input
-        webcam_image = st.camera_input("Take a picture")
-        
-        if webcam_image is not None:
-            # Convert to PIL Image
-            image = Image.open(webcam_image)
-            
+        if app.model is None:
+            st.warning("⚠️ Please load a model first in the sidebar before using live webcam detection!")
+            st.info("💡 Click 'Load Model' in the sidebar to get started.")
+        else:
+            # Webcam controls
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader("Captured Image")
-                st.image(image, caption="Webcam Capture", use_column_width=True)
-            
-            # Run detection
-            if app.model is not None:
-                with st.spinner("Running detection..."):
-                    result = app.predict_image(image, conf_threshold)
+                st.subheader("🎥 Webcam Controls")
+                st.markdown("""
+                **Instructions:**
+                1. Click 'Start Webcam' to begin live detection
+                2. Point your camera at objects to detect
+                3. Supported objects: Toolbox, Fire Extinguisher, Oxygen Tank
+                4. Click 'Stop Webcam' to end the session
+                """)
                 
-                if result is not None:
-                    # Draw detections
-                    annotated_image = app.draw_detections(image, result)
+                # Detection settings
+                st.subheader("⚙️ Detection Settings")
+                detection_fps = st.slider("Detection FPS", 1, 30, 10, help="Frames per second for object detection")
+                show_confidence = st.checkbox("Show Confidence Scores", value=True)
+                
+            with col2:
+                st.subheader("📊 Live Statistics")
+                # Placeholder for live stats
+                stats_placeholder = st.empty()
+                chart_placeholder = st.empty()
+            
+            # Live detection statistics
+            if 'detection_history' not in st.session_state:
+                st.session_state.detection_history = []
+            
+            # WebRTC configuration
+            rtc_configuration = RTCConfiguration({
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            })
+            
+            # Create video transformer
+            video_transformer = LiveObjectDetection(
+                model=app.model,
+                class_names=app.class_names,
+                class_colors=app.class_colors,
+                conf_threshold=conf_threshold
+            )
+            
+            # WebRTC streamer
+            webrtc_ctx = webrtc_streamer(
+                key="live-detection",
+                video_transformer_factory=lambda: video_transformer,
+                rtc_configuration=rtc_configuration,
+                media_stream_constraints={"video": True, "audio": False},
+                async_processing=True,
+            )
+            
+            # Live detection display
+            if webrtc_ctx.state.playing:
+                st.success("🎥 Live webcam detection is active!")
+                
+                # Create columns for live display
+                live_col1, live_col2 = st.columns(2)
+                
+                with live_col1:
+                    st.subheader("🎯 Current Detections")
+                    detection_display = st.empty()
+                    
+                    # Display current detections
+                    try:
+                        while not video_transformer.detection_queue.empty():
+                            detection = video_transformer.detection_queue.get_nowait()
+                            st.session_state.detection_history.append(detection)
+                            
+                            # Keep only last 50 detections
+                            if len(st.session_state.detection_history) > 50:
+                                st.session_state.detection_history = st.session_state.detection_history[-50:]
+                    except:
+                        pass
+                    
+                    # Display recent detections
+                    if st.session_state.detection_history:
+                        recent_detections = st.session_state.detection_history[-10:]  # Show last 10
+                        for i, detection in enumerate(reversed(recent_detections)):
+                            time_diff = time.time() - detection['timestamp']
+                            if time_diff < 5:  # Only show detections from last 5 seconds
+                                st.markdown(f"""
+                                **{detection['class']}** 
+                                - Confidence: {detection['confidence']:.2f}
+                                - Time: {time_diff:.1f}s ago
+                                ---
+                                """)
+                
+                with live_col2:
+                    st.subheader("📈 Detection Statistics")
+                    
+                    # Create live statistics
+                    if st.session_state.detection_history:
+                        # Count detections by class
+                        class_counts = {}
+                        for detection in st.session_state.detection_history:
+                            class_name = detection['class']
+                            class_counts[class_name] = class_counts.get(class_name, 0) + 1
+                        
+                        # Display counts
+                        for class_name, count in class_counts.items():
+                            color = app.class_colors.get(class_name, "#808080")
+                            st.markdown(f"""
+                            <div style="background-color: {color}; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                                <strong>{class_name}:</strong> {count} detections
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Create live chart
+                        if class_counts:
+                            fig = go.Figure(data=[go.Pie(
+                                labels=list(class_counts.keys()),
+                                values=list(class_counts.values()),
+                                hole=0.3,
+                                marker_colors=[app.class_colors.get(cls, '#808080') for cls in class_counts.keys()]
+                            )])
+                            
+                            fig.update_layout(
+                                title="Live Detection Distribution",
+                                showlegend=True,
+                                height=300
+                            )
+                            
+                            chart_placeholder.plotly_chart(fig, use_container_width=True)
+                
+                # Download live session data
+                st.subheader("📥 Download Live Session Data")
+                if st.session_state.detection_history:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Download detection log
+                        detection_log = []
+                        for detection in st.session_state.detection_history:
+                            detection_log.append({
+                                'Timestamp': datetime.fromtimestamp(detection['timestamp']).strftime('%Y-%m-%d %H:%M:%S'),
+                                'Class': detection['class'],
+                                'Confidence': detection['confidence'],
+                                'Bounding Box': detection['bbox']
+                            })
+                        
+                        df = pd.DataFrame(detection_log)
+                        csv_buffer = io.BytesIO()
+                        df.to_csv(csv_buffer, index=False)
+                        csv_buffer.seek(0)
+                        
+                        st.download_button(
+                            label="📊 Download Detection Log (CSV)",
+                            data=csv_buffer.getvalue(),
+                            file_name=f"live_detection_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
                     
                     with col2:
-                        st.subheader("Detection Results")
-                        st.image(annotated_image, caption="Detected Objects", use_column_width=True)
-                    
-                    # Show statistics
-                    stats_df = app.create_detection_stats(result)
-                    if not stats_df.empty:
-                        st.subheader("Detection Statistics")
-                        st.dataframe(stats_df, use_container_width=True)
-                else:
-                    st.error("Detection failed!")
+                        # Download session report
+                        session_report = f"""
+# Live Webcam Detection Session Report
+Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## Session Information
+- Detection confidence threshold: {conf_threshold}
+- Total detections: {len(st.session_state.detection_history)}
+- Session duration: {time.time() - min([d['timestamp'] for d in st.session_state.detection_history]):.1f} seconds
+
+## Detection Summary
+"""
+                        for class_name in app.class_names:
+                            count = sum(1 for d in st.session_state.detection_history if d['class'] == class_name)
+                            session_report += f"- {class_name}: {count} detections\n"
+                        
+                        session_report += "\n## Detailed Detection Log\n"
+                        for i, detection in enumerate(st.session_state.detection_history):
+                            session_report += f"\n### Detection {i+1}\n"
+                            session_report += f"- Time: {datetime.fromtimestamp(detection['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}\n"
+                            session_report += f"- Class: {detection['class']}\n"
+                            session_report += f"- Confidence: {detection['confidence']:.3f}\n"
+                            session_report += f"- Bounding Box: {detection['bbox']}\n"
+                        
+                        report_buffer = io.BytesIO()
+                        report_buffer.write(session_report.encode())
+                        report_buffer.seek(0)
+                        
+                        st.download_button(
+                            label="📄 Download Session Report (MD)",
+                            data=report_buffer.getvalue(),
+                            file_name=f"live_session_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                            mime="text/markdown"
+                        )
             else:
-                st.warning("Please load a model first!")
+                st.info("🎥 Click 'Start Webcam' to begin live object detection")
+                
+                # Show supported objects
+                st.subheader("🎯 Supported Objects")
+                obj_col1, obj_col2, obj_col3 = st.columns(3)
+                
+                with obj_col1:
+                    st.markdown("""
+                    <div style="text-align: center; padding: 20px; background-color: #E56626; border-radius: 10px; color: white;">
+                        <h3>🔧 Toolbox</h3>
+                        <p>Detects various types of toolboxes</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with obj_col2:
+                    st.markdown("""
+                    <div style="text-align: center; padding: 20px; background-color: #FF0000; border-radius: 10px; color: white;">
+                        <h3>🧯 Fire Extinguisher</h3>
+                        <p>Detects fire extinguishers</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with obj_col3:
+                    st.markdown("""
+                    <div style="text-align: center; padding: 20px; background-color: #D4CEC1; border-radius: 10px; color: black;">
+                        <h3>🫧 Oxygen Tank</h3>
+                        <p>Detects oxygen tanks</p>
+                    </div>
+                    """, unsafe_allow_html=True)
     
     with tab3:
         st.header("Analytics Dashboard")
@@ -727,4 +947,4 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     )
 
 if __name__ == "__main__":
-    main() 
+    main()

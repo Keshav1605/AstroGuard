@@ -6,9 +6,11 @@ path: ./dataset  # Dataset root directory
 train: train/images  # Train images (relative to 'path')
 val: val/images      # Val images (relative to 'path')
 test: test/images    # Test images (relative to 'path')
+nc: 3
+names: ["Toolbox", "Oxygen Tank", "Fire Extinguisher"]
 
 # Classes
-names:
+class_names:
   0: Toolbox
   1: Oxygen Tank
   2: Fire Extinguisher
