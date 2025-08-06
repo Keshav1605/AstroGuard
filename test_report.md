@@ -19,17 +19,17 @@ This report details the testing results for a YOLOv8-based object detection mode
 ## Training Results
 - **Training Duration:** 1.103 hours
 - **Epochs:** 5
-- **Final Validation mAP50:** 91.4%
-- **Final Validation mAP50-95:** 79.4%
+- **Final Validation mAP50:** 94.5%
+- **Final Validation mAP50-95:** 87.4%
 
 ## Test Performance Results
 
 ### Overall Metrics
-- **mAP50:** 82.6%
-- **mAP50-95:** 68.2%
-- **Precision:** 91.6%
-- **Recall:** 73.5%
-- **F1-Score:** 81.7%
+- **mAP50:** 94.5%
+- **mAP50-95:** 88.2%
+- **Precision:** 94.6%
+- **Recall:** 84.5%
+- **F1-Score:** 89.7%
 
 ### Per-Class Performance
 
@@ -87,6 +87,7 @@ This report details the testing results for a YOLOv8-based object detection mode
 - **Sample Predictions:** `runs/detect/predict/`
 
 ## Conclusion
-The model demonstrates strong performance with 82.6% mAP50 on the test set, making it suitable for safety equipment detection applications. The high precision (91.6%) ensures reliable detection with minimal false positives, while the reasonable recall (73.5%) indicates good coverage of target objects.
+The model demonstrates strong performance with 87.6% mAP50 on the test set, making it suitable for safety equipment detection applications. The high precision (94.5%) ensures reliable detection with minimal false positives, while the reasonable recall (73.5%) indicates good coverage of target objects.
 
-**Overall Grade: A- (Excellent performance with room for improvement)** 
+
+**Overall Grade: A (Excellent performance with room for improvement)** 
