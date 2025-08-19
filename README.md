@@ -1,4 +1,4 @@
-# 🚀 YOLOv8 Space Station Object Detection
+# 🚀AstroGuard - YOLOv8 Space Station Object Detection
 
 A complete object detection pipeline using YOLOv8 to detect **Toolbox**, **Oxygen Tank**, and **Fire Extinguisher** in space station environments using synthetic data from Duality AI Falcon platform.
 
